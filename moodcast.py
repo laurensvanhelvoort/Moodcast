@@ -1,9 +1,12 @@
+import os
 import os.path
 import pickle
 from tkinter import *
 from tkinter import messagebox
+from tkinter.font import Font
 
 import numpy as np
+from PIL import ImageTk, Image
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator
@@ -12,10 +15,15 @@ from scipy.interpolate import interp1d
 days_counter = []
 mood_list = []
 mood_options = ["awful", "bad", "meh", "good", "amazing"]
+bg_col = "#1e1e1e"
 
 root = Tk()
 root.geometry("750x450")
+root.minsize(450, 350)
+root.configure(bg=bg_col)
 root.title("Moodcast")
+
+font = Font(family="Segoe UI", size=10)
 
 
 def register_mood(current_mood):
@@ -41,7 +49,7 @@ def show_graph():
     if len(mood_list) > 3:
         make_graph(days_counter, mood_list)
     else:
-        messagebox.showwarning(title="Warning", message="First input mood")
+        messagebox.showwarning(title="Warning", message="Wait for day 4 to see graph")
 
 
 def make_graph(days, moods):
@@ -98,28 +106,70 @@ def save_progress():
     with open('days_data.pkl', 'wb') as f:
         pickle.dump(days_counter, f)
 
+    print("Data saved!")
+
 
 def load_progress():
     global mood_list
     global days_counter
 
-    # Load data from pickle files
-    with open('mood_data.pkl', 'rb') as f:
-        mood_list = pickle.load(f)
+    if os.path.exists("./days_data.pkl") and os.path.exists("./mood_data.pkl"):
+        # Load data from pickle files
+        with open('mood_data.pkl', 'rb') as f:
+            mood_list = pickle.load(f)
 
-    with open('days_data.pkl', 'rb') as f:
-        days_counter = pickle.load(f)
+        with open('days_data.pkl', 'rb') as f:
+            days_counter = pickle.load(f)
+
+
+def clear_history():
+    # Get filesizes
+    mood_data_filesize = os.path.getsize("./mood_data.pkl")
+    days_data_filesize = os.path.getsize("./days_data.pkl")
+
+    # Pickle file with empty list is 5 bytes, so check if empty
+    if mood_data_filesize and days_data_filesize > 5:
+        answer = messagebox.askokcancel("Warning", "Do you want to delete your mood history?\n\n"
+                                                   "All your previous data will be lost.")
+        if answer:
+            # Empty out pickle files
+            with open('mood_data.pkl', 'wb') as f:
+                pickle.dump([], f)
+
+            with open('days_data.pkl', 'wb') as f:
+                pickle.dump([], f)
+
+            # Reload data
+            load_progress()
+    else:
+        messagebox.showwarning(title="Warning", message="You have no mood history yet!")
 
 
 # On startup, load available data
-if os.path.exists("./days_data.pkl") and os.path.exists("./mood_data.pkl"):
-    load_progress()
+load_progress()
 
-# Iterate over mood options and place buttons
+spacing = 0.15
+img_size = [50, 50]
+img_list = []
+
 for count, mood in enumerate(mood_options):
-    mood_btn = Button(root, text=mood.capitalize(), command=lambda mood=mood: register_mood(mood)) \
-        .place(relx=(count + 1) * 0.15, rely=0.5)
+    # Place buttons
+    mood_btn = Button(root, text=mood.capitalize(), command=lambda mood=mood: register_mood(mood), width=7, font=font,
+                      bg='darkgrey', fg='black') \
+        .place(relx=(count + 1) * spacing, rely=0.5)
 
-graph_btn = Button(root, text="Show graph", command=show_graph).place(relx=0.45, rely=0.1)
+    # Place images
+    mood_img = Image.open(f"img/{mood}.png")
+    mood_img_copy = mood_img.resize(img_size, Image.ANTIALIAS)
+    mood_img_resized = ImageTk.PhotoImage(mood_img_copy)
+    img_list.append(mood_img_resized)
+    Label(root, image=mood_img_resized, bg=bg_col).place(relx=(count + 1) * spacing, rely=0.35)
+
+graph_btn = Button(root, text="Show graph", command=show_graph, font=font, bg='#5E10BC', fg='white', padx=8, pady=8) \
+    .place(relx=0.5, rely=0.8, anchor=CENTER)
+banner_lbl = Label(root, text="Moodcast", font=('Segoe UI Bold', 32), bg='#5E10BC', fg='white') \
+    .pack(fill=X, anchor='center')
+clear_btn = Button(root, text="Clear history", command=clear_history, font=font, bg='darkgrey', fg='black').place(
+    rely=1, relx=1.0, x=-7, y=-7, anchor=SE)
 
 root.mainloop()
